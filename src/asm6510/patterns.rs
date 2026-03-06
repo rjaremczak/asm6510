@@ -35,10 +35,16 @@ impl AsmPatterns {
         let dec_num = String::from("\\d{1,5}");
         let bin_num = String::from("%[01]{1,16}");
         let mnemonic = String::from("([a-z]{3})\\s*");
-        let num_or_symbol = format!("(?:{})|(?:{})|(?:{})|(?:{})", hex_num, dec_num, bin_num, SYMBOL);
+        let num_or_symbol = format!(
+            "(?:{})|(?:{})|(?:{})|(?:{})",
+            hex_num, dec_num, bin_num, SYMBOL
+        );
         let lo_hi_prefix = format!("[{}|{}]?", LO_BYTE_MODIFIER, HI_BYTE_MODIFIER);
         let operand = format!("({}(?:{}))\\s*", lo_hi_prefix, num_or_symbol);
-        let operand_list = format!("((?:(?:{}(?:{})){})+)\\s*", lo_hi_prefix, num_or_symbol, SEPARATOR);
+        let operand_list = format!(
+            "((?:(?:{}(?:{})){})+)\\s*",
+            lo_hi_prefix, num_or_symbol, SEPARATOR
+        );
         let branch_mnemonic = String::from("(BCC|BCS|BNE|BEQ|BMI|BPL|BVC|BVS)\\s*");
         let branch_target = format!("((?:[+|-]?\\d{{1,3}})|(?:{}))\\s*", SYMBOL);
         AsmPatterns {
@@ -65,7 +71,13 @@ mod tests {
 
     use super::*;
 
-    fn assert_line(regex: &Regex, line: &str, label: Option<&str>, operation: Option<&str>, operand: Option<&str>) {
+    fn assert_line(
+        regex: &Regex,
+        line: &str,
+        label: Option<&str>,
+        operation: Option<&str>,
+        operand: Option<&str>,
+    ) {
         match regex.captures(line) {
             Some(caps) => {
                 let t = Tokens::new(caps);
@@ -82,7 +94,13 @@ mod tests {
 
     #[test]
     fn match_label() {
-        assert_line(&AsmPatterns::new().empty_line, "label:", Some("label"), None, None);
+        assert_line(
+            &AsmPatterns::new().empty_line,
+            "label:",
+            Some("label"),
+            None,
+            None,
+        );
     }
 
     #[test]
@@ -141,6 +159,12 @@ mod tests {
         assert_line(&ap.empty_line, " ", None, None, None);
         assert_line(&ap.empty_line, " ;komentarz", None, None, None);
         assert_line(&ap.ins_implied, "  CLI ;komentarz", None, Some("CLI"), None);
-        assert_line(&ap.ins_indexed_indirect_x, "  LDA ($8c,X) ;asd", None, Some("LDA"), Some("$8c"));
+        assert_line(
+            &ap.ins_indexed_indirect_x,
+            "  LDA ($8c,X) ;asd",
+            None,
+            Some("LDA"),
+            Some("$8c"),
+        );
     }
 }

@@ -1,16 +1,16 @@
-use crate::asm6510::patterns;
-use crate::emu6510::{addrmode::*, instruction::*, *};
-
-use super::operand::{Operand, Resolver};
-use super::tokens::Tokens;
+use super::AddrMode;
+use super::AddrMode::*;
 use super::AsmError;
+use super::Instruction;
+use super::Instruction::*;
+use super::operand::{Operand, Resolver};
+use super::operation;
+use super::patterns;
+use super::tokens::Tokens;
 
 use regex::Regex;
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::str::FromStr;
-use AddrMode::Implied;
-use Instruction::{JMP, JSR};
 
 type Handler = fn(&mut Assembler, tokens: Tokens) -> Result<(), AsmError>;
 
@@ -39,18 +39,33 @@ impl Assembler {
                 let p = patterns::AsmPatterns::new();
                 vec![
                     (p.empty_line, Assembler::handle_empty_line),
-                    (p.cmd_set_location_counter, Assembler::handle_set_location_counter),
+                    (
+                        p.cmd_set_location_counter,
+                        Assembler::handle_set_location_counter,
+                    ),
                     (p.cmd_emit_bytes, Assembler::handle_emit_bytes),
                     (p.cmd_emit_words, Assembler::handle_emit_words),
                     (p.ins_implied, Assembler::handle_implied),
                     (p.ins_immediate, Assembler::handle_immediate),
                     (p.ins_branch, Assembler::handle_relative),
                     (p.ins_absolute, Assembler::handle_absolute),
-                    (p.ins_absolute_indexed_x, Assembler::handle_absolute_indexed_x),
-                    (p.ins_absolute_indexed_y, Assembler::handle_absolute_indexed_y),
+                    (
+                        p.ins_absolute_indexed_x,
+                        Assembler::handle_absolute_indexed_x,
+                    ),
+                    (
+                        p.ins_absolute_indexed_y,
+                        Assembler::handle_absolute_indexed_y,
+                    ),
                     (p.ins_indirect, Assembler::handle_indirect),
-                    (p.ins_indexed_indirect_x, Assembler::handle_indexed_indirect_x),
-                    (p.ins_indirect_indexed_y, Assembler::handle_indirect_indexed_y),
+                    (
+                        p.ins_indexed_indirect_x,
+                        Assembler::handle_indexed_indirect_x,
+                    ),
+                    (
+                        p.ins_indirect_indexed_y,
+                        Assembler::handle_indirect_indexed_y,
+                    ),
                 ]
             },
         }
@@ -61,7 +76,8 @@ impl Assembler {
             if let Some(captures) = regex.captures(&line) {
                 let tokens = Tokens::new(captures);
                 if let Some(label) = tokens.label() {
-                    self.resolver.define_symbol(label, self.location_counter as i32)?;
+                    self.resolver
+                        .define_symbol(label, self.location_counter as i32)?;
                 };
                 return handler(self, tokens);
             }
@@ -85,7 +101,11 @@ impl Assembler {
         }
     }
 
-    fn prepare_operand(&mut self, addrmode: AddrMode, opstr: Option<&str>) -> Result<Operand, AsmError> {
+    fn prepare_operand(
+        &mut self,
+        addrmode: AddrMode,
+        opstr: Option<&str>,
+    ) -> Result<Operand, AsmError> {
         if addrmode == AddrMode::Implied {
             Ok(Operand::literal(0))
         } else {
@@ -102,10 +122,13 @@ impl Assembler {
 
     fn assemble(&mut self, addrmode: AddrMode, tokens: Tokens) -> Result<(), AsmError> {
         let operand = self.prepare_operand(addrmode, tokens.operand())?;
-        let mnemonic = tokens.operation().ok_or(AsmError::SyntaxError(tokens.to_string()))?;
-        let instruction = Instruction::from_str(mnemonic)?;
+        let mnemonic = tokens
+            .operation()
+            .ok_or(AsmError::SyntaxError(tokens.to_string()))?;
+        let instruction = Instruction::parse(mnemonic)?;
         let addrmode = optimize_addrmode(instruction, addrmode, operand);
-        let opcode = operation::find_opcode(instruction, addrmode).ok_or(AsmError::NoOpCode(instruction, addrmode))?;
+        let opcode = operation::find_opcode(instruction, addrmode)
+            .ok_or(AsmError::NoOpCode(instruction, addrmode))?;
         self.emit_byte(opcode);
         match addrmode.len() {
             1 => self.emit_byte(operand.value as u8),
@@ -173,11 +196,11 @@ impl Assembler {
     }
 
     fn handle_absolute_indexed_x(&mut self, tokens: Tokens) -> Result<(), AsmError> {
-        self.assemble(AddrMode::IndexedX, tokens)
+        self.assemble(AddrMode::IndexedIndirectX, tokens)
     }
 
     fn handle_absolute_indexed_y(&mut self, tokens: Tokens) -> Result<(), AsmError> {
-        self.assemble(AddrMode::IndexedY, tokens)
+        self.assemble(AddrMode::IndirectIndexedY, tokens)
     }
 
     fn handle_indirect(&mut self, tokens: Tokens) -> Result<(), AsmError> {
@@ -226,18 +249,25 @@ impl Assembler {
     pub fn process_file(&mut self, generate_code: bool, strbuf: &String) -> Result<(), AsmError> {
         self.init_pass(generate_code);
         for (num, line) in strbuf.lines().enumerate() {
-            self.process_line(line).map_err(|e| AsmError::AsmLineError(num + 1, Box::from(e)))?;
+            self.process_line(line)
+                .map_err(|e| AsmError::AsmLineError(num + 1, Box::from(e)))?;
         }
         Ok(())
     }
 }
 
 fn optimize_addrmode(instr: Instruction, addrmode: AddrMode, op: Operand) -> AddrMode {
-    if addrmode != Implied && instr != JSR && instr != JMP && !op.symbolic && op.value >= 0 && op.value <= 255 {
+    if addrmode != Implied
+        && instr != Jsr
+        && instr != Jmp
+        && !op.symbolic
+        && op.value >= 0
+        && op.value <= 255
+    {
         match addrmode {
             AddrMode::Absolute => AddrMode::ZeroPage,
-            AddrMode::IndexedX => AddrMode::ZeroPageX,
-            AddrMode::IndexedY => AddrMode::ZeroPageY,
+            AddrMode::IndexedIndirectX => AddrMode::ZeroPageX,
+            AddrMode::IndirectIndexedY => AddrMode::ZeroPageY,
             _ => addrmode,
         }
     } else {
@@ -252,9 +282,17 @@ mod tests {
     fn assert_next(asm: &mut Assembler, line: &str, expected: &[u8]) {
         let r = asm.process_line(line);
         assert!(r.is_ok(), "line \"{}\" : {:?}", line, r);
-        assert!(asm.code.len() >= expected.len(), "line \"{}\" : code too short", line);
+        assert!(
+            asm.code.len() >= expected.len(),
+            "line \"{}\" : code too short",
+            line
+        );
         let generated = &asm.code[(asm.code.len() - expected.len())..];
-        assert_eq!(generated, expected, "generated code {:?} differs from {:?}", generated, expected);
+        assert_eq!(
+            generated, expected,
+            "generated code {:?} differs from {:?}",
+            generated, expected
+        );
     }
 
     fn assert_asm(line: &str, code: &[u8]) -> Assembler {
@@ -275,7 +313,10 @@ mod tests {
     #[test]
     fn tokenize() {
         let patterns = patterns::AsmPatterns::new();
-        let captures = patterns.ins_absolute_indexed_x.captures("LDA etykieta,X").unwrap();
+        let captures = patterns
+            .ins_absolute_indexed_x
+            .captures("LDA etykieta,X")
+            .unwrap();
         let tokens = Tokens::new(captures);
         assert_eq!(tokens.operation(), Some("LDA"));
         assert_eq!(tokens.operand(), Some("etykieta"));
@@ -373,7 +414,10 @@ mod tests {
 
     #[test]
     fn relative_mode() {
-        assert_asm("BCC -1", &[0x90, u8::from_ne_bytes((-1 as i8).to_ne_bytes())]);
+        assert_asm(
+            "BCC -1",
+            &[0x90, u8::from_ne_bytes((-1 as i8).to_ne_bytes())],
+        );
         assert_asm("BVS +8", &[0x70, 8]);
     }
 
@@ -385,7 +429,11 @@ mod tests {
         assert_eq!(asm.location_counter, 0x607);
         assert_next(&mut asm, "BEQ after", &[0xF0, 0x0A]);
         assert_eq!(asm.location_counter, 0x0609);
-        assert_next(&mut asm, "BCC before", &[0x90, u8::from_ne_bytes((-11 as i8).to_ne_bytes())]);
+        assert_next(
+            &mut asm,
+            "BCC before",
+            &[0x90, u8::from_ne_bytes((-11 as i8).to_ne_bytes())],
+        );
         assert_eq!(asm.location_counter, 0x060B);
     }
 
@@ -425,7 +473,11 @@ mod tests {
         assert!(asm.resolver.define_symbol("dziabaDucha", 0xaf02).is_ok());
         asm.init_pass(true);
         assert!(asm.set_location_counter(1000).is_ok());
-        assert_next(&mut asm, "TestLabel_01:  SEI   ; disable interrupts ", &[0x78]);
+        assert_next(
+            &mut asm,
+            "TestLabel_01:  SEI   ; disable interrupts ",
+            &[0x78],
+        );
         assert_next(&mut asm, "c:lda dziabaDucha", &[0xad, 0x02, 0xaf]);
         assert_eq!(asm.resolver.symbols().get("TestLabel_01").unwrap(), &1000);
         assert_eq!(asm.resolver.symbols().get("TestLabel_02"), None);
@@ -437,7 +489,10 @@ mod tests {
     fn emit_bytes() {
         assert_asm(".BYTE 20", &[20]);
         assert_asm(".BYTE $20 45 $4a", &[0x20, 45, 0x4a]);
-        assert_asm(".BYTE $20, $3f,$4a ,$23 , 123", &[0x20, 0x3f, 0x4a, 0x23, 123]);
+        assert_asm(
+            ".BYTE $20, $3f,$4a ,$23 , 123",
+            &[0x20, 0x3f, 0x4a, 0x23, 123],
+        );
         assert_asm(
             "dcb 0,0,0,0,0,0,0,0,0,$b,$b,$c,$f,$f,$f,$f",
             &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0xb, 0xb, 0xc, 0xf, 0xf, 0xf, 0xf],
@@ -446,8 +501,14 @@ mod tests {
 
     #[test]
     fn emit_words() {
-        assert_asm(".word $20ff $23af $fab0 ;komm", &[0xff, 0x20, 0xaf, 0x23, 0xb0, 0xfa]);
-        assert_asm(".word $3000 $15ad 1024", &[0x00, 0x30, 0xad, 0x15, 0x00, 0x04]);
+        assert_asm(
+            ".word $20ff $23af $fab0 ;komm",
+            &[0xff, 0x20, 0xaf, 0x23, 0xb0, 0xfa],
+        );
+        assert_asm(
+            ".word $3000 $15ad 1024",
+            &[0x00, 0x30, 0xad, 0x15, 0x00, 0x04],
+        );
     }
 
     #[test]
