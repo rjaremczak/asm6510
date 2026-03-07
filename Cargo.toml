@@ -7,5 +7,5 @@ edition = "2018"
 
 [dependencies]
 regex = "1"
-structopt = "0.3.26"
+clap = { version = "4.5.60", features = ["derive"] }
 lazy_static = "1.4.0"
