@@ -1,6 +1,6 @@
 use super::addrmode::{AddrMode, AddrMode::*};
 use super::instruction::Instruction::{self, *};
-use crate::error::AppError;
+use super::error::AppError;
 
 #[derive(Debug)]
 pub struct Operation {

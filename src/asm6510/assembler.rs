@@ -1,6 +1,6 @@
 use super::AddrMode;
 use super::AddrMode::*;
-use super::AsmError;
+use super::error::AppError;
 use super::Instruction;
 use super::Instruction::*;
 use super::operand::{Operand, Resolver};
@@ -12,7 +12,7 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-type Handler = fn(&mut Assembler, tokens: Tokens) -> Result<(), AsmError>;
+type Handler = fn(&mut Assembler, tokens: Tokens) -> Result<(), AppError>;
 
 const DEFAULT_LOCATION_COUNTER: u16 = 0;
 
@@ -71,7 +71,7 @@ impl Assembler {
         }
     }
 
-    pub fn process_line(&mut self, line: &str) -> Result<(), AsmError> {
+    pub fn process_line(&mut self, line: &str) -> Result<(), AppError> {
         for (regex, handler) in self.handlers.iter() {
             if let Some(captures) = regex.captures(&line) {
                 let tokens = Tokens::new(captures);
@@ -82,22 +82,22 @@ impl Assembler {
                 return handler(self, tokens);
             }
         }
-        Err(AsmError::SyntaxError(String::from(line)))
+        Err(AppError::SyntaxError(String::from(line)))
     }
 
-    fn parse_operand_list(&self, oplist: Option<&str>) -> Result<Vec<i32>, AsmError> {
+    fn parse_operand_list(&self, oplist: Option<&str>) -> Result<Vec<i32>, AppError> {
         match oplist {
             Some(oplist) => {
                 let mut values: Vec<i32> = Vec::new();
                 for opstr in self.op_list_separator.split(oplist) {
                     match self.resolver.resolve(opstr, self.generate_code) {
                         Ok(operand) => values.push(operand.value),
-                        Err(err) => return Err(err),
+                        Err(err) => return Err(AppError::SyntaxError(err.to_string())),
                     }
                 }
                 Ok(values)
             }
-            None => Err(AsmError::MissingOperand),
+            None => Err(AppError::MissingOperand),
         }
     }
 
@@ -105,30 +105,29 @@ impl Assembler {
         &mut self,
         addrmode: AddrMode,
         opstr: Option<&str>,
-    ) -> Result<Operand, AsmError> {
+    ) -> Result<Operand, AppError> {
         if addrmode == AddrMode::Implied {
             Ok(Operand::literal(0))
         } else {
-            let opstr = opstr.ok_or(AsmError::MissingOperand)?;
+            let opstr = opstr.ok_or(AppError::MissingOperand)?;
             let mut operand = self.resolver.resolve(opstr, self.generate_code)?;
             if self.generate_code && addrmode == AddrMode::Relative && operand.symbolic {
                 let diff = operand.value - self.location_counter as i32 - 2;
-                let displacement = i8::try_from(diff).map_err(|_| AsmError::BranchTooFar(diff))?;
+                let displacement = i8::try_from(diff).map_err(|_| AppError::BranchTooFar(diff))?;
                 operand.value = displacement as i32;
             }
             Ok(operand)
         }
     }
 
-    fn assemble(&mut self, addrmode: AddrMode, tokens: Tokens) -> Result<(), AsmError> {
+    fn assemble(&mut self, addrmode: AddrMode, tokens: Tokens) -> Result<(), AppError> {
         let operand = self.prepare_operand(addrmode, tokens.operand())?;
         let mnemonic = tokens
             .operation()
-            .ok_or(AsmError::SyntaxError(tokens.to_string()))?;
+            .ok_or(AppError::SyntaxError(tokens.to_string()))?;
         let instruction = Instruction::parse(mnemonic)?;
         let addrmode = optimize_addrmode(instruction, addrmode, operand);
-        let opcode = operation::find_opcode(instruction, addrmode)
-            .ok_or(AsmError::NoOpCode(instruction, addrmode))?;
+        let opcode = operation::find_opcode(instruction, addrmode)?;
         self.emit_byte(opcode);
         match addrmode.len() {
             1 => self.emit_byte(operand.value as u8),
@@ -157,61 +156,61 @@ impl Assembler {
         self.origin.unwrap_or(self.location_counter)
     }
 
-    fn handle_empty_line(&mut self, _: Tokens) -> Result<(), AsmError> {
+    fn handle_empty_line(&mut self, _: Tokens) -> Result<(), AppError> {
         Ok(())
     }
 
-    fn handle_set_location_counter(&mut self, tokens: Tokens) -> Result<(), AsmError> {
-        let str = tokens.operand().ok_or(AsmError::MissingOperand)?;
+    fn handle_set_location_counter(&mut self, tokens: Tokens) -> Result<(), AppError> {
+        let str = tokens.operand().ok_or(AppError::MissingOperand)?;
         let operand = self.resolver.resolve(str, false)?;
         self.set_location_counter(operand.value as u16)
     }
 
-    fn handle_emit_bytes(&mut self, tokens: Tokens) -> Result<(), AsmError> {
+    fn handle_emit_bytes(&mut self, tokens: Tokens) -> Result<(), AppError> {
         let values = self.parse_operand_list(tokens.operand())?;
         values.iter().for_each(|v| self.emit_byte(*v as u8));
         Ok(())
     }
 
-    fn handle_emit_words(&mut self, tokens: Tokens) -> Result<(), AsmError> {
+    fn handle_emit_words(&mut self, tokens: Tokens) -> Result<(), AppError> {
         let values = self.parse_operand_list(tokens.operand())?;
         values.iter().for_each(|v| self.emit_word(*v as u16));
         Ok(())
     }
 
-    fn handle_implied(&mut self, tokens: Tokens) -> Result<(), AsmError> {
+    fn handle_implied(&mut self, tokens: Tokens) -> Result<(), AppError> {
         self.assemble(AddrMode::Implied, tokens)
     }
 
-    fn handle_immediate(&mut self, tokens: Tokens) -> Result<(), AsmError> {
+    fn handle_immediate(&mut self, tokens: Tokens) -> Result<(), AppError> {
         self.assemble(AddrMode::Immediate, tokens)
     }
 
-    fn handle_relative(&mut self, tokens: Tokens) -> Result<(), AsmError> {
+    fn handle_relative(&mut self, tokens: Tokens) -> Result<(), AppError> {
         self.assemble(AddrMode::Relative, tokens)
     }
 
-    fn handle_absolute(&mut self, tokens: Tokens) -> Result<(), AsmError> {
+    fn handle_absolute(&mut self, tokens: Tokens) -> Result<(), AppError> {
         self.assemble(AddrMode::Absolute, tokens)
     }
 
-    fn handle_absolute_indexed_x(&mut self, tokens: Tokens) -> Result<(), AsmError> {
+    fn handle_absolute_indexed_x(&mut self, tokens: Tokens) -> Result<(), AppError> {
         self.assemble(AddrMode::IndexedIndirectX, tokens)
     }
 
-    fn handle_absolute_indexed_y(&mut self, tokens: Tokens) -> Result<(), AsmError> {
+    fn handle_absolute_indexed_y(&mut self, tokens: Tokens) -> Result<(), AppError> {
         self.assemble(AddrMode::IndirectIndexedY, tokens)
     }
 
-    fn handle_indirect(&mut self, tokens: Tokens) -> Result<(), AsmError> {
+    fn handle_indirect(&mut self, tokens: Tokens) -> Result<(), AppError> {
         self.assemble(AddrMode::Indirect, tokens)
     }
 
-    fn handle_indexed_indirect_x(&mut self, tokens: Tokens) -> Result<(), AsmError> {
+    fn handle_indexed_indirect_x(&mut self, tokens: Tokens) -> Result<(), AppError> {
         self.assemble(AddrMode::IndexedIndirectX, tokens)
     }
 
-    fn handle_indirect_indexed_y(&mut self, tokens: Tokens) -> Result<(), AsmError> {
+    fn handle_indirect_indexed_y(&mut self, tokens: Tokens) -> Result<(), AppError> {
         self.assemble(AddrMode::IndirectIndexedY, tokens)
     }
 
@@ -227,7 +226,7 @@ impl Assembler {
         self.emit_byte((word >> 8) as u8);
     }
 
-    pub fn set_location_counter(&mut self, addr: u16) -> Result<(), AsmError> {
+    pub fn set_location_counter(&mut self, addr: u16) -> Result<(), AppError> {
         if self.origin.is_none() {
             self.origin = Some(addr);
             self.location_counter = addr;
@@ -242,15 +241,15 @@ impl Assembler {
             }
             Ok(())
         } else {
-            Err(AsmError::OriginTooLow(addr, self.location_counter))
+            Err(AppError::OriginTooLow(addr, self.location_counter))
         }
     }
 
-    pub fn process_file(&mut self, generate_code: bool, strbuf: &String) -> Result<(), AsmError> {
+    pub fn process_file(&mut self, generate_code: bool, strbuf: &String) -> Result<(), AppError> {
         self.init_pass(generate_code);
         for (num, line) in strbuf.lines().enumerate() {
             self.process_line(line)
-                .map_err(|e| AsmError::AsmLineError(num + 1, Box::from(e)))?;
+                .map_err(|e| AppError::AsmLineError(num + 1, Box::from(e)))?;
         }
         Ok(())
     }

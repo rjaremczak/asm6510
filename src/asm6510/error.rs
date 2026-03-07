@@ -1,5 +1,4 @@
 use crate::asm6510::{addrmode::AddrMode, instruction::Instruction};
-use crossterm::ErrorKind;
 use std::fmt::Display;
 
 #[derive(Debug)]
@@ -14,11 +13,7 @@ pub enum AppError {
     InvalidMnemonic(String),
     ParseIntError(String, std::num::ParseIntError),
     IoError(std::io::Error),
-    EmulatorAlreadyRunning,
-    EmulatorNotRunning,
     InvalidOpCode(u16, u8),
-    CrossTermError(ErrorKind),
-    MiniFbError(minifb::Error),
     AsmLineError(usize, Box<AppError>),
 }
 
@@ -31,17 +26,5 @@ impl Display for AppError {
 impl From<std::io::Error> for AppError {
     fn from(err: std::io::Error) -> Self {
         Self::IoError(err)
-    }
-}
-
-impl From<ErrorKind> for AppError {
-    fn from(err: ErrorKind) -> Self {
-        Self::CrossTermError(err)
-    }
-}
-
-impl From<minifb::Error> for AppError {
-    fn from(err: minifb::Error) -> Self {
-        Self::MiniFbError(err)
     }
 }

@@ -1,6 +1,5 @@
 use std::str::FromStr;
-
-use super::AsmError;
+use super::error::AppError;
 use super::instruction::Instruction::{self, *};
 
 pub(crate) static MNEMONICS: [(Instruction, &str); 57] = [
@@ -64,7 +63,7 @@ pub(crate) static MNEMONICS: [(Instruction, &str); 57] = [
 ];
 
 impl FromStr for Instruction {
-    type Err = AsmError;
+    type Err = AppError;
 
     fn from_str(mnemonic: &str) -> Result<Self, Self::Err> {
         let mn_norm = mnemonic.to_uppercase();
@@ -73,7 +72,7 @@ impl FromStr for Instruction {
                 return Ok(i);
             }
         }
-        Err(AsmError::InvalidMnemonic(mnemonic.to_string()))
+        Err(AppError::InvalidMnemonic(mnemonic.to_string()))
     }
 }
 
@@ -106,9 +105,9 @@ mod tests {
 
     #[test]
     fn find_mnemonic_ok() {
-        assert_eq!(Instruction::from_str("LDX").unwrap(), LDX);
-        assert_eq!(Instruction::from_str("LDA").unwrap(), LDA);
-        assert_eq!(Instruction::from_str("lda").unwrap(), LDA);
+        assert_eq!(Instruction::from_str("LDX").unwrap(), Ldx);
+        assert_eq!(Instruction::from_str("LDA").unwrap(), Lda);
+        assert_eq!(Instruction::from_str("lda").unwrap(), Lda);
     }
 
     #[test]
@@ -118,9 +117,9 @@ mod tests {
 
     #[test]
     fn get_mnemonic() {
-        assert_eq!(LDA.to_string(), "LDA");
-        assert_eq!(TXA.to_string(), "TXA");
-        assert_eq!(KIL.to_string(), "KIL");
-        assert_eq!(JMP.to_string(), "JMP");
+        assert_eq!(Lda.to_string(), "LDA");
+        assert_eq!(Txa.to_string(), "TXA");
+        assert_eq!(Kil.to_string(), "KIL");
+        assert_eq!(Jmp.to_string(), "JMP");
     }
 }

@@ -1,4 +1,6 @@
-use super::mnemonic::MNEMONICS;
+use std::collections::BTreeMap;
+use super::Instruction::*;
+use super::error::*;
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash)]
 pub enum Instruction {

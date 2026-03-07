@@ -1,8 +1,15 @@
-mod asm6510;
-mod error;
+#[macro_use]
+extern crate lazy_static;
 
-use std::{fs::File, path::PathBuf};
+mod asm6510;
+
+use std::path::PathBuf;
 use structopt::StructOpt;
+use asm6510::error::AppError;
+
+fn parse_hex(hex: &str) -> Result<u16, AppError> {
+    u16::from_str_radix(hex, 16).map_err(|e| AppError::ParseIntError(String::from(hex), e))
+}
 
 #[derive(Debug, StructOpt)]
 #[structopt(about = "My Own 65xx assembler and disassembler")]
@@ -28,32 +35,23 @@ enum Mode {
     },
     /// Disassemble machine code
     Dasm {
-        /// Binary file path
-        #[structopt(parse(from_os_str))]
-        bin: PathBuf,
         /// Start address
         #[structopt(parse(try_from_str = parse_hex))]
         start_addr: u16,
         /// End address
         #[structopt(parse(try_from_str = parse_hex))]
         end_addr: Option<u16>,
+        /// Binary file path
+        #[structopt(parse(from_os_str))]
+        bin: PathBuf,
     },
 }
 
 fn main() {
     let cliopt = CliOpt::from_args();
-    let result = match cliopt.mode.unwrap_or(Mode::Console { clock_mhz: 1.0 }) {
-        Mode::Asm {
-            src,
-            bin,
-            dump_symbols,
-        } => asm6510::assemble_file(src),
-        Mode::Dasm {
-            start_addr,
-            end_addr,
-            bin,
-        } => asm6510::disassemble_file(start_addr, end_addr, bin),
-        Mode::Console { clock_mhz } => Console::start(APP_NAME, clock_mhz * 1e6),
+    let result = match cliopt.mode.unwrap_or() {
+        Mode::Asm {src,bin,dump_symbols} => asm6510::assemble_file(src),
+        Mode::Dasm {start_addr,end_addr,bin} => asm6510::disassemble_file(start_addr, end_addr, bin),
     };
     if let Err(apperr) = result {
         println!("\nerror: {:?}", apperr)

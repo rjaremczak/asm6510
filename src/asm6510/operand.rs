@@ -1,5 +1,5 @@
-use super::AsmError;
 use std::collections::HashMap;
+use super::error::AppError;
 
 pub const LO_BYTE_MODIFIER: char = '<';
 pub const HI_BYTE_MODIFIER: char = '>';
@@ -66,17 +66,17 @@ impl Resolver {
         Self { symbols: HashMap::new() }
     }
 
-    pub fn resolve(&self, txt: &str, no_symbol_fail: bool) -> Result<Operand, AsmError> {
+    pub fn resolve(&self, txt: &str, no_symbol_fail: bool) -> Result<Operand, AppError> {
         let modifier = Modifier::from(txt);
         let rest = &txt[modifier.len()..];
         self.resolve_raw(rest, no_symbol_fail).and_then(|op| Ok(op.modified(modifier)))
     }
 
-    pub fn define_symbol(&mut self, key: &str, val: i32) -> Result<(), AsmError> {
+    pub fn define_symbol(&mut self, key: &str, val: i32) -> Result<(), AppError> {
         match self.symbols.insert(String::from(key), val) {
             Some(old) => {
                 if old != val {
-                    Err(AsmError::RedefinedSymbol(String::from(key), old, val))
+                    Err(AppError::RedefinedSymbol(String::from(key), old, val))
                 } else {
                     Ok(())
                 }
@@ -89,7 +89,7 @@ impl Resolver {
         &self.symbols
     }
 
-    fn resolve_raw(&self, raw: &str, no_symbol_fail: bool) -> Result<Operand, AsmError> {
+    fn resolve_raw(&self, raw: &str, no_symbol_fail: bool) -> Result<Operand, AppError> {
         match raw.chars().next() {
             Some(c) => match c {
                 HEX_PREFIX => parse_int(&raw[1..], 16),
@@ -100,21 +100,21 @@ impl Resolver {
                     } else if let Some(num) = self.symbols.get(raw) {
                         Ok(Operand::symbol(*num))
                     } else if no_symbol_fail {
-                        Err(AsmError::UndefinedSymbol(raw.to_string()))
+                        Err(AppError::UndefinedSymbol(raw.to_string()))
                     } else {
                         Ok(Operand::symbol(0))
                     }
                 }
             },
-            None => Err(AsmError::MissingOperand),
+            None => Err(AppError::MissingOperand),
         }
     }
 }
 
-fn parse_int(str: &str, radix: u32) -> Result<Operand, AsmError> {
+fn parse_int(str: &str, radix: u32) -> Result<Operand, AppError> {
     match i32::from_str_radix(str, radix) {
         Ok(num) => Ok(Operand::literal(num)),
-        Err(perr) => Err(AsmError::ParseIntError(String::from(str), perr)),
+        Err(perr) => Err(AppError::ParseIntError(String::from(str), perr)),
     }
 }
 
@@ -129,7 +129,7 @@ mod tests {
         op
     }
 
-    fn assert_err(txt: &str, _experr: AsmError) {
+    fn assert_err(txt: &str, _experr: AppError) {
         match operand_parser().resolve(txt, true) {
             Ok(_) => assert!(false),
             Err(err) => assert!(matches!(err, _experr)),
@@ -193,6 +193,6 @@ mod tests {
         assert_ok("label_2", 0xac02);
         assert_ok("<label_1", 0xfe);
         assert_ok(">label_1", 0x2f);
-        assert_err("labeloza", AsmError::UndefinedSymbol(String::from("labeloza")));
+        assert_err("labeloza", AppError::UndefinedSymbol(String::from("labeloza")));
     }
 }
