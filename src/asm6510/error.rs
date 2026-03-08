@@ -15,6 +15,7 @@ pub enum AppError {
     IoError(std::io::Error),
     InvalidOpCode(u16, u8),
     AsmLineError(usize, Box<AppError>),
+    CliParsingError
 }
 
 impl Display for AppError {
