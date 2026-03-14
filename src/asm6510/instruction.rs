@@ -61,7 +61,7 @@ pub enum Instruction {
 
 use crate::asm6510::error::AppError;
 use Instruction::*;
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 
 static MNEMONICS: [(Instruction, &str); 57] = [
     (Kil, "KIL"),
@@ -137,11 +137,11 @@ impl FromStr for Instruction {
     }
 }
 
-impl ToString for Instruction {
-    fn to_string(&self) -> String {
+impl Display for Instruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, m) in MNEMONICS {
             if self == &i {
-                return m.to_string();
+                return write!(f, "{}", m);
             }
         }
         panic!("no mnemonic for instruction {:?}", &self);
