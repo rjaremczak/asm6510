@@ -1,6 +1,3 @@
-use std::collections::BTreeMap;
-use super::Instruction::*;
-use super::error::*;
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash)]
 pub enum Instruction {
@@ -63,109 +60,128 @@ pub enum Instruction {
     Kil,
 }
 
-impl Instruction {
-    pub fn mnemonic(&self) -> &'static str {
-        MNEMONICS.get(self).unwrap()
-    }
+use std::str::FromStr;
+use Instruction::*;
+use crate::asm6510::error::AppError;
 
-    pub fn parse(mnemonic: &str) -> Result<Instruction, AppError> {
-        let m = &mnemonic.to_uppercase();
-        MNEMONICS
-            .iter()
-            .find(|kv| kv.1 == m)
-            .map(|kv| *kv.0)
-            .ok_or(AppError::InvalidMnemonic(String::from(mnemonic)))
+static MNEMONICS: [(Instruction, &str); 57] = [
+    (Kil, "KIL"),
+    (Adc, "ADC"),
+    (Sbc, "SBC"),
+    (And, "AND"),
+    (Ora, "ORA"),
+    (Asl, "ASL"),
+    (Lsr, "LSR"),
+    (Eor, "EOR"),
+    (Rol, "ROL"),
+    (Ror, "ROR"),
+    (Bit, "BIT"),
+    (Cmp, "CMP"),
+    (Cpx, "CPX"),
+    (Cpy, "CPY"),
+    (Inc, "INC"),
+    (Inx, "INX"),
+    (Iny, "INY"),
+    (Dec, "DEC"),
+    (Dex, "DEX"),
+    (Dey, "DEY"),
+    (Bcc, "BCC"),
+    (Bcs, "BCS"),
+    (Beq, "BEQ"),
+    (Bmi, "BMI"),
+    (Bne, "BNE"),
+    (Bpl, "BPL"),
+    (Bvc, "BVC"),
+    (Bvs, "BVS"),
+    (Clc, "CLC"),
+    (Cld, "CLD"),
+    (Cli, "CLI"),
+    (Clv, "CLV"),
+    (Sec, "SEC"),
+    (Sed, "SED"),
+    (Sei, "SEI"),
+    (Jmp, "JMP"),
+    (Jsr, "JSR"),
+    (Brk, "BRK"),
+    (Rti, "RTI"),
+    (Rts, "RTS"),
+    (Lda, "LDA"),
+    (Ldx, "LDX"),
+    (Ldy, "LDY"),
+    (Sta, "STA"),
+    (Stx, "STX"),
+    (Sty, "STY"),
+    (Tax, "TAX"),
+    (Tay, "TAY"),
+    (Tsx, "TSX"),
+    (Txa, "TXA"),
+    (Tya, "TYA"),
+    (Txs, "TXS"),
+    (Pha, "PHA"),
+    (Php, "PHP"),
+    (Pla, "PLA"),
+    (Plp, "PLP"),
+    (Nop, "NOP"),
+];
+
+impl FromStr for Instruction {
+    type Err = AppError;
+
+    fn from_str(mnemonic: &str) -> Result<Self, Self::Err> {
+        let mn_norm = mnemonic.to_uppercase();
+        for (i, m) in MNEMONICS {
+            if mn_norm == m {
+                return Ok(i);
+            }
+        }
+        Err(AppError::InvalidMnemonic(mnemonic.to_string()))
     }
 }
 
-lazy_static! {
-    static ref MNEMONICS: BTreeMap<Instruction, &'static str> = {
-        let mut m = BTreeMap::new();
-        m.insert(Kil, "KIL");
-        m.insert(Adc, "ADC");
-        m.insert(Sbc, "SBC");
-        m.insert(And, "AND");
-        m.insert(Ora, "ORA");
-        m.insert(Asl, "ASL");
-        m.insert(Lsr, "LSR");
-        m.insert(Eor, "EOR");
-        m.insert(Rol, "ROL");
-        m.insert(Ror, "ROR");
-        m.insert(Bit, "BIT");
-        m.insert(Cmp, "CMP");
-        m.insert(Cpx, "CPX");
-        m.insert(Cpy, "CPY");
-        m.insert(Inc, "INC");
-        m.insert(Inx, "INX");
-        m.insert(Iny, "INY");
-        m.insert(Dec, "DEC");
-        m.insert(Dex, "DEX");
-        m.insert(Dey, "DEY");
-        m.insert(Bcc, "BCC");
-        m.insert(Bcs, "BCS");
-        m.insert(Beq, "BEQ");
-        m.insert(Bmi, "BMI");
-        m.insert(Bne, "BNE");
-        m.insert(Bpl, "BPL");
-        m.insert(Bvc, "BVC");
-        m.insert(Bvs, "BVS");
-        m.insert(Clc, "CLC");
-        m.insert(Cld, "CLD");
-        m.insert(Cli, "CLI");
-        m.insert(Clv, "CLV");
-        m.insert(Sec, "SEC");
-        m.insert(Sed, "SED");
-        m.insert(Sei, "SEI");
-        m.insert(Jmp, "JMP");
-        m.insert(Jsr, "JSR");
-        m.insert(Brk, "BRK");
-        m.insert(Rti, "RTI");
-        m.insert(Rts, "RTS");
-        m.insert(Lda, "LDA");
-        m.insert(Ldx, "LDX");
-        m.insert(Ldy, "LDY");
-        m.insert(Sta, "STA");
-        m.insert(Stx, "STX");
-        m.insert(Sty, "STY");
-        m.insert(Tax, "TAX");
-        m.insert(Tay, "TAY");
-        m.insert(Tsx, "TSX");
-        m.insert(Txa, "TXA");
-        m.insert(Tya, "TYA");
-        m.insert(Txs, "TXS");
-        m.insert(Pha, "PHA");
-        m.insert(Php, "PHP");
-        m.insert(Pla, "PLA");
-        m.insert(Plp, "PLP");
-        m.insert(Nop, "NOP");
-        m
-    };
+impl ToString for Instruction {
+    fn to_string(&self) -> String {
+        for (i, m) in MNEMONICS {
+            if self == &i {
+                return m.to_string();
+            }
+        }
+        panic!("no mnemonic for instruction {:?}", &self);
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Instruction::*;
     use super::*;
+    use std::{collections::HashSet, str::FromStr};
+
+    #[test]
+    fn check_uniqueness() {
+        let mut instructions: HashSet<Instruction> = HashSet::new();
+        let mut mnemonics: HashSet<&str> = HashSet::new();
+
+        for (i, m) in MNEMONICS {
+            assert!(instructions.insert(i), "instruction {:?} not unique", i);
+            assert!(mnemonics.insert(m), "mnemonic {} not unique", m);
+        }
+    }
 
     #[test]
     fn find_mnemonic_ok() {
-        assert_eq!(Instruction::parse("LDX").unwrap(), Ldx);
-        assert_eq!(Instruction::parse("LDA").unwrap(), Lda);
+        assert_eq!(Instruction::from_str("LDX").unwrap(), Ldx);
+        assert_eq!(Instruction::from_str("LDA").unwrap(), Lda);
+        assert_eq!(Instruction::from_str("lda").unwrap(), Lda);
     }
 
     #[test]
     fn find_mnemonic_failed() {
-        assert!(matches!(
-            Instruction::parse("JUH"),
-            Err(AppError::InvalidMnemonic(_))
-        ));
+        assert!(Instruction::from_str("JUH").is_err());
     }
 
     #[test]
     fn get_mnemonic() {
-        assert_eq!(Lda.mnemonic(), "LDA");
-        assert_eq!(Txa.mnemonic(), "TXA");
-        assert_eq!(Kil.mnemonic(), "KIL");
-        assert_eq!(Jmp.mnemonic(), "JMP");
+        assert_eq!(Lda.to_string(), "LDA");
+        assert_eq!(Txa.to_string(), "TXA");
+        assert_eq!(Kil.to_string(), "KIL");
+        assert_eq!(Jmp.to_string(), "JMP");
     }
 }

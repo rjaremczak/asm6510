@@ -38,7 +38,7 @@ pub fn find_opcode(instruction: Instruction, addrmode: AddrMode) -> Result<u8, A
         .iter()
         .find(|kv| kv.1.matches(instruction, addrmode))
         .map(|kv| *kv.0)
-        .ok_or(AppError::NoOpCode(instruction, addrmode))
+        .ok_or(AppError::OpCodeNotFound(instruction, addrmode))
 }
 
 use std::collections::BTreeMap;

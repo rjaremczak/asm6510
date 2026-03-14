@@ -6,7 +6,7 @@ pub enum AppError {
     UndefinedSymbol(String),
     RedefinedSymbol(String, i32, i32),
     MissingOperand,
-    NoOpCode(Instruction, AddrMode),
+    OpCodeNotFound(Instruction, AddrMode),
     SyntaxError(String),
     OriginTooLow(u16, u16),
     BranchTooFar(i32),
