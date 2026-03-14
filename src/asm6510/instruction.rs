@@ -1,4 +1,3 @@
-
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Hash)]
 pub enum Instruction {
     Adc,
@@ -60,9 +59,9 @@ pub enum Instruction {
     Kil,
 }
 
-use std::str::FromStr;
-use Instruction::*;
 use crate::asm6510::error::AppError;
+use Instruction::*;
+use std::str::FromStr;
 
 static MNEMONICS: [(Instruction, &str); 57] = [
     (Kil, "KIL"),

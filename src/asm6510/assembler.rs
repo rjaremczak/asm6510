@@ -1,8 +1,8 @@
 use super::AddrMode;
 use super::AddrMode::*;
-use super::error::AppError;
 use super::Instruction;
 use super::Instruction::*;
+use super::error::AppError;
 use super::operand::{Operand, Resolver};
 use super::operation;
 use super::patterns;
@@ -11,6 +11,7 @@ use super::tokens::Tokens;
 use regex::Regex;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::str::FromStr;
 
 type Handler = fn(&mut Assembler, tokens: Tokens) -> Result<(), AppError>;
 
@@ -125,7 +126,7 @@ impl Assembler {
         let mnemonic = tokens
             .operation()
             .ok_or(AppError::SyntaxError(tokens.to_string()))?;
-        let instruction = Instruction::parse(mnemonic)?;
+        let instruction = Instruction::from_str(mnemonic)?;
         let addrmode = optimize_addrmode(instruction, addrmode, operand);
         let opcode = operation::find_opcode(instruction, addrmode)?;
         self.emit_byte(opcode);
@@ -245,7 +246,7 @@ impl Assembler {
         }
     }
 
-    pub fn process_file(&mut self, generate_code: bool, strbuf: &String) -> Result<(), AppError> {
+    pub fn process_file(&mut self, generate_code: bool, strbuf: &str) -> Result<(), AppError> {
         self.init_pass(generate_code);
         for (num, line) in strbuf.lines().enumerate() {
             self.process_line(line)

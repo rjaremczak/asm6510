@@ -2,14 +2,13 @@ pub mod assembler;
 pub mod disassembler;
 
 mod addrmode;
+pub(crate) mod error;
 mod instruction;
 mod memory;
-mod mnemonic;
 mod operand;
 mod operation;
 mod patterns;
 mod tokens;
-pub(crate) mod error;
 
 use addrmode::AddrMode;
 use disassembler::Columns;
