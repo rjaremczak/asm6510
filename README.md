@@ -1,2 +1,2 @@
-# asm6510
-assembler/disassembler for 6510 code
+# asmmos
+assembler/disassembler for MOS 65xx architectures
