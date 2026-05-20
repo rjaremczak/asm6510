@@ -1,2 +1,2 @@
-# asmmos
+# asmos
 assembler/disassembler for MOS 65xx architectures
